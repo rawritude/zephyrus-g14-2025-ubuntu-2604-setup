@@ -256,11 +256,76 @@ systemctl --user daemon-reload
 
 ---
 
-## 7. Gaming setup
+## 7. OLED panel protections
+
+The GA403WM ships with a 3K OLED panel. Linux has **no equivalent of Windows' pixel-shift / panel-refresh routines** — the panel's own firmware does some compensation, but you don't get the OS-level extras Armoury Crate gives you on Windows. Mitigation is "reduce static UI + reduce time at high brightness."
+
+Three knobs do most of the work:
+
+### 7a. Lower idle brightness
+
+Brightness is the single biggest factor in OLED wear — running at 50% roughly doubles panel life vs. 80%. Use **Fn+F7 / Fn+F8** or the Quick Settings slider; aim for ~50% indoors. The power-profile automation in section 6 caps brightness at 50% when you switch to power-saver, which helps if you forget.
+
+### 7b. Faster screen blank
+
+```bash
+gsettings set org.gnome.desktop.session idle-delay 180   # 3 minutes
+gsettings set org.gnome.desktop.screensaver lock-enabled true
+```
+
+Three minutes is the OLED-friendly default — typical thinking pauses are under 2 min so it rarely fires during real work. If you read long articles often, 5 min is fine; just lower brightness more.
+
+### 7c. Hide the top bar + auto-hide the dock
+
+The persistent top bar (clock, indicators) and dock are the two biggest static-UI burn-in risks. Hide them.
+
+**Install Extension Manager** (the GUI for browsing and installing GNOME extensions — Ubuntu doesn't ship it by default):
+
+```bash
+sudo apt install -y gnome-shell-extension-manager
+```
+
+**Top bar — hide via *Just Perfection*:**
+
+1. Open **Extension Manager** → **Browse** tab.
+2. Search for **Just Perfection**, click Install.
+3. Switch to **Installed** tab → gear icon next to Just Perfection → **Visibility** → toggle **Panel** off.
+4. The top bar is now gone except in the Activities overview (Super key).
+
+The toggle is labeled **Panel**, not "Top Bar" — that one threw me. There's also a separate per-element section (Activities button, App menu, etc.) if you'd rather keep the bar but strip it down.
+
+**Alternative for slide-in-on-hover behavior:** install **Hide Top Bar** instead of (or alongside) Just Perfection — it behaves like a macOS menu bar, auto-showing when you hit the top edge.
+
+**Dock — auto-hide instead of always-visible:**
+
+Ubuntu 26.04 ships GNOME's Dash-to-Dock variant by default. Set it to auto-hide:
+
+```bash
+gsettings set org.gnome.shell.extensions.dash-to-dock dock-fixed false
+gsettings set org.gnome.shell.extensions.dash-to-dock intellihide true
+```
+
+`dock-fixed false` is the auto-hide toggle; `intellihide` makes it stay visible until a window actually overlaps it (more pleasant than aggressive auto-hide).
+
+### 7d. Show battery percentage in the top bar
+
+Counter-intuitively this *helps* — you stop hovering over the same static battery icon trying to gauge level, and the percentage text rotates often enough that no single subpixel sees long static load:
+
+```bash
+gsettings set org.gnome.desktop.interface show-battery-percentage true
+```
+
+### 7e. Use Dark mode
+
+Settings → Appearance → **Dark**. Dark backgrounds = many subpixels emitting nothing = less wear and less heat. The whole desktop running dark is the cheapest OLED win there is.
+
+---
+
+## 8. Gaming setup
 
 Steam, Proton-GE, MangoHud, GameMode, dGPU offload, launch options.
 
-### 7a. Steam from apt (not snap)
+### 8a. Steam from apt (not snap)
 
 ```bash
 sudo apt install -y steam mangohud gamemode gamescope protontricks
@@ -268,7 +333,7 @@ sudo apt install -y steam mangohud gamemode gamescope protontricks
 
 The snap version of Steam is sandboxed and notoriously fights with NVIDIA on Wayland — apt is the path that works without ceremony. Steam library lives at `~/.local/share/Steam/`.
 
-### 7b. The missing `prime-run` wrapper
+### 8b. The missing `prime-run` wrapper
 
 Ubuntu 26.04's `nvidia-prime` package ships `prime-select`, `prime-offload`, `prime-switch`, `prime-supported`, but **not** `prime-run` — which is what every Linux gaming guide on the internet tells you to use. Install the wrapper manually:
 
@@ -291,7 +356,7 @@ prime-run glxinfo | grep "OpenGL renderer"
 
 Without `prime-run`, apps render on the Radeon 890M iGPU. With it, they render on the RTX 5060.
 
-### 7c. Proton-GE via ProtonUp-Qt (Flatpak)
+### 8c. Proton-GE via ProtonUp-Qt (Flatpak)
 
 If you've never used Flatpak on this install, add the Flathub remote first:
 
@@ -309,7 +374,7 @@ flatpak run net.davidotek.pupgui2
 
 Inside ProtonUp-Qt → choose Steam → install latest `GE-Proton`. **Fully restart Steam** afterwards or the new Proton version won't appear in the per-game compatibility dropdown.
 
-### 7d. Steam launch options — the cheat sheet
+### 8d. Steam launch options — the cheat sheet
 
 Per game: Properties → General → Launch Options. One line. Steam substitutes `%command%` with the actual game executable.
 
@@ -347,19 +412,19 @@ prime-run %command% -windowed -nosplash
 - omit `%command%`
 - use shell operators (`&&`, `;`) — Steam parses one command line, not a shell
 
-### 7e. `gamemoderun` on battery — pick your spot
+### 8e. `gamemoderun` on battery — pick your spot
 
 GameMode pins the CPU governor to `performance`. That roughly **doubles idle CPU power draw** on this chip. Worth it for AAA / CPU-bound games where you're already burning watts. Wasted on a 2D indie capping at 240fps. I leave it off for light games on battery.
 
-### 7f. Cloud saves: Linux native vs. Proton are separate buckets
+### 8f. Cloud saves: Linux native vs. Proton are separate buckets
 
 This bit me with Vampire Survivors. **Linux native Steam apps and Windows-via-Proton use separate Steam Cloud save buckets per game.** Switching a game from Linux-native to Proton (Properties → Compatibility → "Force the use of a specific Steam Play compatibility tool") will pull the **Windows** cloud saves, not the Linux ones. Pick one, stick with it per game, or accept that you'll need to manually move saves once.
 
 ---
 
-## 8. System tweaks worth doing
+## 9. System tweaks worth doing
 
-### 8a. Standard tooling
+### 9a. Standard tooling
 
 ```bash
 sudo apt install -y \
@@ -368,7 +433,7 @@ sudo apt install -y \
 
 GNOME Tweaks unlocks per-key keyboard remapping, font scaling, and window behavior toggles that aren't in Settings.
 
-### 8b. Lower swappiness (16GB RAM + NVMe)
+### 9b. Lower swappiness (16GB RAM + NVMe)
 
 Default `vm.swappiness=60` is tuned for spinning disks and tight RAM. On 16GB + a Micron NVMe, drop it to 10: less SSD wear, more responsive under memory pressure.
 
@@ -379,7 +444,7 @@ echo 'vm.swappiness=10' | sudo tee /etc/sysctl.d/99-swappiness.conf
 
 Verify after reboot: `sysctl vm.swappiness` → `10`.
 
-### 8c. Set WiFi regulatory domain explicitly
+### 9c. Set WiFi regulatory domain explicitly
 
 The MT7925 supports WiFi 7 / 6GHz, but 6GHz channels are gated by regulatory domain. The kernel's default user-set domain is `00` ("worldwide") and rules get inferred from AP beacons — fine on a normal WiFi 6 router, but some 6GHz APs require an explicit country code to associate.
 
@@ -394,7 +459,7 @@ The first line takes effect immediately; the second line persists across reboots
 
 Verify: `iw reg get` → `country CA: ...`.
 
-### 8d. Auto-security-updates
+### 9d. Auto-security-updates
 
 Ubuntu installs `unattended-upgrades` by default but only the security pocket is enabled. If you want to be sure it's running:
 
@@ -406,7 +471,7 @@ Pick "Yes" to enable. Logs land in `/var/log/unattended-upgrades/`.
 
 ---
 
-## 9. Gotchas worth knowing about
+## 10. Gotchas worth knowing about
 
 ### sudo-rs is the default `sudo` on 26.04
 
@@ -436,7 +501,7 @@ Writes generally need root and a reboot to take effect. Don't blindly `echo` val
 
 ---
 
-## 10. Run-order TL;DR
+## 11. Run-order TL;DR
 
 For someone copying this guide on a fresh 26.04 install, do it in this order:
 
@@ -461,7 +526,17 @@ bash scripts/install-battery-limit.sh 80
 # 5. Power profile automation
 bash scripts/setup-power-automation.sh
 
-# 6. Gaming
+# 6. OLED protections
+gsettings set org.gnome.desktop.session idle-delay 180
+gsettings set org.gnome.desktop.interface show-battery-percentage true
+gsettings set org.gnome.shell.extensions.dash-to-dock dock-fixed false
+gsettings set org.gnome.shell.extensions.dash-to-dock intellihide true
+sudo apt install -y gnome-shell-extension-manager
+# Then open Extension Manager, install "Just Perfection",
+# Visibility tab → toggle "Panel" off (hides the top bar).
+# And switch the desktop to Dark mode (Settings → Appearance).
+
+# 7. Gaming
 sudo apt install -y steam mangohud gamemode gamescope protontricks
 bash scripts/install-prime-run.sh
 flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
