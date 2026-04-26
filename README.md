@@ -52,7 +52,13 @@ You can re-enable Secure Boot **after** Ubuntu is installed — but it's much ea
 - **Linux-only:** the installer's "Erase disk and install Ubuntu" is fine.
 - **Dual-boot:** shrink the C: partition from inside Windows first (Disk Management → right-click C: → Shrink Volume). Don't let the Ubuntu installer resize NTFS for you — it works but is one more thing that can go sideways. Leave 200GB+ free for Ubuntu.
 
-### 0e. Make the installer USB
+### 0e. Decide on full-disk encryption now (one-shot decision)
+
+The Ubuntu installer offers LUKS full-disk encryption during partitioning. **It's effectively a one-shot decision** — there's no clean "turn it on later" path; retrofitting LUKS to a live install means back up, wipe, reinstall, restore. If you might want FDE on a laptop you ever travel with, tick the box during install. Post-install you can still encrypt specific directories with `fscrypt` or `gocryptfs`, but that's not equivalent to FDE.
+
+This guide doesn't cover the encryption decision in either direction — pick what fits your threat model.
+
+### 0f. Make the installer USB
 
 - Download Ubuntu 26.04 LTS desktop ISO from ubuntu.com.
 - Flash with **Ventoy** (multi-ISO, easiest) or **Rufus** (single-ISO, dead simple). Ventoy lets you keep multiple ISOs on one stick for re-flashes.
