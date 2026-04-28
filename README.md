@@ -151,27 +151,36 @@ fwupdmgr get-updates
 
 ---
 
-## 4. Battery: 80% charge limit
+## 4. Battery: charger-aware charge limit
 
-Two reasons for this:
+The 2025 G14 dropped USB-C passthrough charging that the 2024 GA403 had. The 240W **barrel charger** does battery bypass — when plugged in via barrel, the system runs from AC and the battery isn't being cycled. The **USB-C** ports do *not* bypass; the battery stays in the circuit and gets topped off constantly. This is a hardware design choice (not a Linux bug, not fixed by BIOS so far — Windows users have the same complaint).
 
-1. **General longevity** if the laptop lives on AC most of the time.
-2. **GA403WM-specific:** the 2025 G14 dropped USB-C passthrough charging that the 2024 GA403 had. The 240W barrel charger does battery bypass — when plugged in via barrel, the system runs from AC and the battery isn't being cycled. The USB-C ports do **not** bypass; the battery stays in the circuit and gets topped off constantly. This is a hardware design choice (not a Linux bug, not fixed by BIOS so far — Windows users have the same complaint). If you ever charge via USB-C, capping at 80% is the standard mitigation.
+That asymmetry means a flat charge cap is leaving runtime on the table. The installer below sets up a **charger-aware** policy:
+
+| Charger plugged in | Charge limit |
+|---|---|
+| Barrel | 100% (battery bypass anyway, full charge is fine) |
+| USB-C | 80% (battery in circuit, cap to limit cycle wear) |
+| Nothing | 80% (cosmetic; only kicks in when next charger appears) |
 
 ```bash
-bash scripts/install-battery-limit.sh        # default 80%
-bash scripts/install-battery-limit.sh 100    # if you want it off
+bash scripts/install-battery-limit.sh           # 80 on USB-C, 100 on barrel  (recommended)
+bash scripts/install-battery-limit.sh 70        # 70 on USB-C, 100 on barrel
+bash scripts/install-battery-limit.sh 80 80     # static 80% — no boost on barrel
+bash scripts/install-battery-limit.sh 100 100   # effectively disable the cap
 ```
 
-This writes `/etc/udev/rules.d/90-battery.rules` and applies it immediately. The G14 GA403WM exposes its battery as `BAT1` — confirm with `ls /sys/class/power_supply/` before running. If yours is `BAT0`, edit the script.
+How it works: a small policy script in `/usr/local/bin/battery-charge-policy` reads `/sys/class/power_supply/ACAD/online` and writes the appropriate value to `/sys/class/power_supply/BAT1/charge_control_end_threshold`. A udev rule (`/etc/udev/rules.d/90-battery.rules`) runs the script whenever a Mains or USB power supply enters/leaves the system. Logs land in `journalctl -t battery-charge-policy`.
 
-To temporarily charge to 100% for a flight without removing the rule:
+The G14 GA403WM exposes its battery as `BAT1` — confirm with `ls /sys/class/power_supply/` before running. If yours is `BAT0`, edit the generated `/usr/local/bin/battery-charge-policy`.
+
+To temporarily charge past the current limit for a flight without uninstalling:
 
 ```bash
 echo 100 | sudo tee /sys/class/power_supply/BAT1/charge_control_end_threshold
 ```
 
-That resets to 80% on next boot. If your battery later "won't charge past 80%" — it's this rule, not a fault.
+The next charger plug/unplug event will reset to the policy value. If your battery later "won't charge past 80%" on USB-C — it's this rule, not a fault.
 
 ### Expected battery life with this setup
 
@@ -520,8 +529,8 @@ echo 'options cfg80211 ieee80211_regdom=CA' | sudo tee /etc/modprobe.d/cfg80211.
 # 3. Brightness perms (then log out/in)
 bash scripts/fix-brightness-perms.sh
 
-# 4. Battery cap
-bash scripts/install-battery-limit.sh 80
+# 4. Battery cap (charger-aware: 80% on USB-C, 100% on barrel)
+bash scripts/install-battery-limit.sh
 
 # 5. Power profile automation
 bash scripts/setup-power-automation.sh
@@ -552,7 +561,7 @@ That's it. Everything in this guide is reversible — the udev rule, the user-le
 
 ```
 README.md                              this guide
-scripts/install-battery-limit.sh       80% charge cap via udev
+scripts/install-battery-limit.sh       Charger-aware battery charge policy via udev
 scripts/install-prime-run.sh           dGPU offload wrapper
 scripts/fix-brightness-perms.sh        brightnessctl group fix
 scripts/setup-power-automation.sh      one-shot per-profile system tweaks
